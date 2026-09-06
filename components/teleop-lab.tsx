@@ -156,7 +156,7 @@ export default function TeleopLab() {
             <canvas
               ref={overlay}
               className="pose-overlay"
-              aria-label="Tracked body landmarks; highlighted right wrist"
+              aria-label="Tracked shoulders and right arm; highlighted right wrist"
             />
             {!active && (
               <div className="camera-empty">
@@ -165,9 +165,9 @@ export default function TeleopLab() {
                 </div>
                 <h2>You are the input.</h2>
                 <p>
-                  Keep your shoulders, right arm,
+                  Keep both shoulders, your right elbow,
                   <br />
-                  and hips in the camera frame.
+                  and wrist in the camera frame.
                 </p>
                 <Button
                   className="primary-action"
@@ -312,7 +312,8 @@ export default function TeleopLab() {
               <span className="stage-number">02 / TRANSFORM</span>
               <h3>Find a body frame</h3>
               <p>
-                Shoulders and hips define local axes. Wrist displacement is
+                Your shoulder line and camera-up direction define local axes.
+                Keep the camera level and stay upright. Wrist displacement is
                 normalized by shoulder width, then mapped from your neutral pose
                 into the robot’s workspace.
               </p>

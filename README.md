@@ -1,6 +1,6 @@
 # Kinetic
 
-Control a simulated robot arm with your webcam. Kinetic connects human pose estimation, coordinate transforms, and inverse kinematics to turn wrist movement into robot motion.
+Control a simulated robot arm with your webcam. Only both shoulders, your right elbow, and wrist need to be visible. Kinetic connects human pose estimation, coordinate transforms, and inverse kinematics to turn wrist movement into robot motion.
 
 ## How it works
 
@@ -10,16 +10,16 @@ Webcam → pose landmarks → body-relative wrist motion
 ```
 
 - **Pose estimation:** A pretrained MediaPipe Pose Landmarker Lite model estimates body landmarks locally in a worker.
-- **Coordinate transforms:** Shoulder and hip landmarks define a body coordinate frame. Wrist displacement is normalized by shoulder width.
+- **Coordinate transforms:** The shoulder line and camera-up direction define local axes. Wrist displacement is measured from the right shoulder and normalized by shoulder width.
 - **Motion control:** Neutral-pose calibration and a clutch let the operator reposition their hand. Exponential smoothing uses a 120 ms time constant.
 - **Robot kinematics:** Analytic inverse kinematics computes base, shoulder, and elbow angles within a bounded workspace. Joint speed is limited to 90°/s.
 - **Tracking loss:** Visibility below 0.65 or frames older than 300 ms hold the arm. Resuming requires explicit engagement.
 
 Three.js renders the arm, target, and motion trail. Telemetry shows pose rate, inference latency, landmark visibility, and frame age.
 
-The current system controls end-effector position in a three-joint simulation. Depth is inferred from a single camera; it is not a calibrated distance measurement.
+The current system controls end-effector position in a three-joint simulation. Use a level camera and stay upright; torso pitch is not tracked. Depth is inferred from a single camera; it is not a calibrated distance measurement.
 
-Thirteen tests cover calibration, coordinate invariance, tracking loss, joint speed limits, and kinematics across 1,331 requested targets. Run them with `npm test`. The synthetic demo has been browser-tested; live webcam inference and performance remain unverified.
+Tests cover calibration with hips missing, coordinate transforms, tracking loss, joint speed limits, and kinematics across 1,331 requested targets. Run them with `npm test`. The synthetic demo has been browser-tested; live webcam inference and performance remain unverified.
 
 ## Try it
 

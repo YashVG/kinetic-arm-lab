@@ -4,7 +4,7 @@ The useful claim is: “I integrated pretrained pose estimation with body coordi
 
 ## Two-minute walkthrough
 
-1. Enable the webcam and frame your shoulders, hips, and right arm. Explain that image landmarks draw the overlay, while inferred world landmarks feed the controller.
+1. Enable the webcam and frame both shoulders, your right elbow, and wrist. Hips can stay outside the frame. Use a level camera and stay upright: the shoulder line and camera-up direction define the control axes. Image landmarks draw the overlay, while inferred world landmarks feed the controller.
 2. Hold still and calibrate. Thirty valid observations must have a normalized RMS spread of at most 0.09 shoulder spans.
 3. Engage control and reach sideways, up, and in depth. Explain that depth is the least reliable direction with a single RGB camera.
 4. Hold, reposition your hand, then engage again. The controller redefines the neutral hand position at the current robot endpoint.

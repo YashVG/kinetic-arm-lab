@@ -29,15 +29,18 @@ export type PoseFrame = {
   capturedAt: number;
   inferenceMs: number | null;
 };
-export const REQUIRED = [11, 12, 14, 16, 23, 24];
+// Both shoulders and the controlling arm's elbow and wrist.
+export const REQUIRED = [11, 12, 14, 16] as const;
 export const MAX_AGE_MS = 300;
 export const MIN_VISIBILITY = 0.65;
 export const MAX_TRAIL_POINTS = 160;
 const vec = (p: Landmark): Vec3 => [p.x, p.y, p.z];
 
-/** Express the right wrist in an orthonormal body frame, in shoulder-span units.
- * x = anatomical right, y = torso up, z = x cross y (body depth).
- * The body origin is the right shoulder. No metric camera calibration is implied.
+/** Express the right wrist in shoulder-span units, relative to the right shoulder.
+ * x = anatomical right, y = camera up projected perpendicular to x, z = x cross y.
+ * This needs no torso landmarks, but assumes an upright operator and level camera;
+ * shoulder yaw is compensated, while torso pitch cannot be recovered from two points.
+ * No metric camera calibration is implied.
  */
 export function bodyWrist(
   frame: PoseFrame,
@@ -49,7 +52,11 @@ export function bodyWrist(
         frame.landmarks[i] &&
         [...vec(frame.world[i]), ...vec(frame.landmarks[i])].every(
           Number.isFinite,
-        ),
+        ) &&
+        frame.landmarks[i].x >= 0 &&
+        frame.landmarks[i].x <= 1 &&
+        frame.landmarks[i].y >= 0 &&
+        frame.landmarks[i].y <= 1,
     )
   )
     return null;
@@ -67,19 +74,16 @@ export function bodyWrist(
     visibility > 1
   )
     return null;
-  const [left, right, leftHip, rightHip] = [11, 12, 23, 24].map((i) =>
-    vec(frame.world[i]),
-  );
+  const [left, right] = [11, 12].map((i) => vec(frame.world[i]));
   const shoulder = sub(right, left);
   const span = length(shoulder);
   if (span < 0.08 || span > 1.0) return null;
   const x = unit(shoulder)!;
-  const up = sub(
-    scale(add(left, right), 0.5),
-    scale(add(leftHip, rightHip), 0.5),
-  );
-  const y = unit(sub(up, scale(x, dot(up, x))));
-  if (!y || length(up) < 0.1) return null;
+  const cameraUp: Vec3 = [0, -1, 0];
+  const up = sub(cameraUp, scale(x, dot(cameraUp, x)));
+  // Avoid an unstable frame when the shoulder line is almost vertical.
+  if (length(up) < 0.2) return null;
+  const y = unit(up)!;
   const z = cross(x, y);
   const relative = sub(vec(frame.world[16]), right);
   return {
@@ -127,7 +131,7 @@ export class TeleopController {
       this.hold(
         age > MAX_AGE_MS
           ? 'Tracking delayed. Engage again when ready.'
-          : 'Keep shoulders, hips, and your right arm visible.',
+          : 'Keep both shoulders, your right elbow, and wrist in view. Stay upright.',
       );
       return;
     }

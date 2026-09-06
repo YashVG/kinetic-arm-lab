@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  MIN_VISIBILITY,
+  REQUIRED,
   TeleopController,
   type Landmark,
   type PoseFrame,
@@ -11,15 +13,8 @@ import type { SceneState } from '@/components/arm-scene';
 type Source = 'none' | 'camera' | 'sample';
 const CONNECTIONS = [
   [11, 12],
-  [11, 13],
-  [13, 15],
   [12, 14],
   [14, 16],
-  [11, 23],
-  [12, 24],
-  [23, 24],
-  [23, 25],
-  [24, 26],
 ];
 function paint(
   canvas: HTMLCanvasElement | null,
@@ -33,8 +28,20 @@ function paint(
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   ctx.clearRect(0, 0, width, height);
-  const visible = (i: number) =>
-    landmarks[i] && (landmarks[i].visibility ?? 0) > 0.5;
+  const visible = (i: number) => {
+    const p = landmarks[i];
+    return (
+      p &&
+      Number.isFinite(p.x) &&
+      Number.isFinite(p.y) &&
+      p.x >= 0 &&
+      p.x <= 1 &&
+      p.y >= 0 &&
+      p.y <= 1 &&
+      (p.visibility ?? 0) >= MIN_VISIBILITY &&
+      (p.presence ?? 1) >= MIN_VISIBILITY
+    );
+  };
   ctx.lineWidth = width / 200;
   ctx.lineCap = 'round';
   for (const [a, b] of CONNECTIONS) {
@@ -45,7 +52,7 @@ function paint(
     ctx.lineTo(landmarks[b].x * width, landmarks[b].y * height);
     ctx.stroke();
   }
-  for (const i of [11, 12, 13, 14, 15, 16, 23, 24, 25, 26]) {
+  for (const i of REQUIRED) {
     if (!visible(i)) continue;
     ctx.fillStyle = i === 16 ? '#ffffff' : '#b0f2ce';
     ctx.beginPath();

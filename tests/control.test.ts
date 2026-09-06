@@ -13,7 +13,13 @@ import {
   UPPER_ARM,
   type Vec3,
 } from '../lib/kinematics.ts';
-import { bodyWrist, MAX_AGE_MS, TeleopController } from '../lib/controller.ts';
+import {
+  bodyWrist,
+  MAX_AGE_MS,
+  REQUIRED,
+  TeleopController,
+  type Landmark,
+} from '../lib/controller.ts';
 import { samplePose } from '../lib/sample-pose.ts';
 
 const near = (a: Vec3, b: Vec3, tolerance = 1e-8) =>
@@ -21,12 +27,18 @@ const near = (a: Vec3, b: Vec3, tolerance = 1e-8) =>
     length(sub(a, b)) < tolerance,
     'Expected vectors to agree: ' + JSON.stringify({ a, b }),
   );
-function calibrated() {
+function upperBodyPose(time: number, capturedAt: number) {
+  const frame = samplePose(time, capturedAt);
+  // A cropped observation can have no lower-body entries at all.
+  frame.world = frame.world.slice(0, 17);
+  frame.landmarks = frame.landmarks.slice(0, 17);
+  return frame;
+}
+function calibrated(pose = samplePose) {
   const c = new TeleopController();
-  c.ingest(samplePose(0, 1000), 1000);
+  c.ingest(pose(0, 1000), 1000);
   assert.equal(c.calibrate(1000), true);
-  for (let i = 1; i <= 30; i++)
-    c.ingest(samplePose(0, 1000 + i * 50), 1000 + i * 50);
+  for (let i = 1; i <= 30; i++) c.ingest(pose(0, 1000 + i * 50), 1000 + i * 50);
   assert.ok(c.baseline);
   assert.equal(c.calibrating, false);
   return c;
@@ -82,8 +94,8 @@ void test('joint slew never exceeds 90 degrees per second and never overshoots',
     }
   }
 });
-void test('body mapping is invariant to rigid rotation, translation, and uniform scale', () => {
-  const frame = samplePose(0, 1000);
+void test('shoulder mapping is invariant to yaw, translation, and uniform scale', () => {
+  const frame = upperBodyPose(0, 1000);
   const expected = bodyWrist(frame)!.wrist;
   const angle = 0.83,
     co = Math.cos(angle),
@@ -98,6 +110,87 @@ void test('body mapping is invariant to rigid rotation, translation, and uniform
     })),
   };
   near(bodyWrist(moved)!.wrist, expected);
+});
+void test('missing or unreliable hips and other unused landmarks do not affect control input', () => {
+  const frame = samplePose(0, 1000);
+  const expected = bodyWrist(frame)!;
+  const cropped = bodyWrist(upperBodyPose(0, 1000))!;
+  near(cropped.wrist, expected.wrist);
+  assert.equal(cropped.visibility, expected.visibility);
+
+  // The model may hallucinate unseen landmarks, or emit non-finite values for them.
+  for (let i = 0; i < frame.world.length; i++) {
+    if (REQUIRED.some((required) => required === i)) continue;
+    frame.world[i] = { x: NaN, y: Infinity, z: -Infinity };
+    frame.landmarks[i] = {
+      x: NaN,
+      y: 2,
+      z: Infinity,
+      visibility: 0,
+      presence: 0,
+    };
+  }
+  const observation = bodyWrist(frame)!;
+  near(observation.wrist, expected.wrist);
+  assert.equal(observation.visibility, expected.visibility);
+});
+void test('lateral, upward, and depth wrist movement keep their control directions without hips', () => {
+  const initial = bodyWrist(upperBodyPose(0, 1000))!.wrist;
+  // With an upright, front-facing pose, anatomical right and camera up are -x and -y.
+  for (const [axis, key, displacement] of [
+    [0, 'x', -0.09],
+    [1, 'y', -0.09],
+    [2, 'z', 0.09],
+  ] as const) {
+    const frame = upperBodyPose(0, 1000);
+    frame.world[16][key] += displacement;
+    const delta = sub(bodyWrist(frame)!.wrist, initial);
+    const expected: Vec3 = [0, 0, 0];
+    expected[axis] = 0.25; // 9 cm divided by the fixture's 36 cm shoulder span.
+    near(delta, expected);
+  }
+});
+void test('each shoulder, right elbow, and wrist must be visible and inside the camera frame', () => {
+  for (const index of REQUIRED) {
+    for (const missing of ['world', 'landmarks'] as const) {
+      const frame = upperBodyPose(0, 1000);
+      const sparse: Landmark[] = [];
+      for (const [i, landmark] of frame[missing].entries())
+        if (i !== index) sparse[i] = landmark;
+      frame[missing] = sparse;
+      assert.equal(bodyWrist(frame), null);
+    }
+    for (const change of [
+      { visibility: 0.2 },
+      { presence: 0.2 },
+      { x: -0.01 },
+      { x: 1.01 },
+      { y: -0.01 },
+      { y: 1.01 },
+    ]) {
+      const frame = upperBodyPose(0, 1000);
+      Object.assign(frame.landmarks[index], change);
+      assert.equal(bodyWrist(frame), null);
+    }
+  }
+});
+void test('an almost vertical shoulder line is rejected instead of producing unstable axes', () => {
+  const c = calibrated(upperBodyPose);
+  assert.equal(c.engage(2500), true);
+  const before = [...c.joints] as Vec3;
+  for (const dx of [-0.01, 0, 0.01]) {
+    const frame = upperBodyPose(0, 2600 + dx * 1000);
+    frame.world[12] = {
+      ...frame.world[11],
+      x: frame.world[11].x + dx,
+      y: frame.world[11].y + 0.36,
+    };
+    assert.equal(bodyWrist(frame), null);
+    c.ingest(frame, frame.capturedAt);
+    c.tick(frame.capturedAt, 0.05);
+    assert.equal(c.engaged, false);
+    near(c.joints, before);
+  }
 });
 void test('occluded, missing, non-finite, and degenerate body observations are rejected', () => {
   const occluded = samplePose(0, 1000);
@@ -182,13 +275,13 @@ void test('hold cancels an in-progress calibration', () => {
   c.hold();
   assert.equal(c.calibrating, false);
 });
-void test('a deterministic 20-second pose sequence moves the arm and stays bounded', () => {
-  const c = calibrated();
-  c.engage(2500);
+void test('calibration and 20 seconds of bounded control work with hips missing throughout', () => {
+  const c = calibrated(upperBodyPose);
+  assert.equal(c.engage(2500), true);
   let maxTravel = 0;
   for (let i = 1; i <= 400; i++) {
     const now = 2500 + i * 50;
-    c.ingest(samplePose(i * 0.05, now), now);
+    c.ingest(upperBodyPose(i * 0.05, now), now);
     const before: [number, number, number] = [...c.joints];
     c.tick(now, 0.05);
     for (let j = 0; j < 3; j++)
@@ -196,6 +289,8 @@ void test('a deterministic 20-second pose sequence moves the arm and stays bound
     maxTravel = Math.max(maxTravel, length(sub(forward(c.joints)[2], HOME)));
   }
   assert.ok(maxTravel > 0.12);
+  assert.equal(c.tracking, true);
+  assert.equal(c.engaged, true);
   assert.ok(c.trail.length <= 160);
   assert.equal(c.metrics(22500).p95, null);
 });
