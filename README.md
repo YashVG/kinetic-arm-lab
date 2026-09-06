@@ -40,3 +40,30 @@ npm start
 Open [localhost:3000](http://localhost:3000), enable the camera, calibrate, and engage control. **Try sample motion** runs the control loop with synthetic landmarks.
 
 [Demo guide](DEMO.md) · [Third-party notices](THIRD_PARTY.md)
+
+## Camera calibration with OpenCV
+
+Optional lens correction runs before pose inference. A local Python utility detects
+checkerboard corners, estimates camera intrinsics and five distortion coefficients,
+and exports a profile plus an original/undistorted comparison. Every fifth view is
+held out from intrinsic fitting; both training and held-out reprojection RMS are reported.
+
+In the website, expand **Lens correction** for profile import, error metrics, the
+original feed, and per-frame correction time. Profiles remain in tab memory.
+Changing correction settings stops control and requires a fresh neutral pose.
+
+See the [camera calibration guide](public/camera-calibration-guide.html) (also linked
+inside the running app) for capture commands and a printable checkerboard. Requires
+Python 3.11+; the Python environment is separate from the website.
+
+The browser uses a bilinear CPU remap of the OpenCV pinhole model, preserving the
+original camera matrix and resolution without cropping. It does not load OpenCV.js.
+Use the same camera, resolution, zoom and focus; mismatched resolutions are rejected.
+Black borders can appear. Reprojection error measures checkerboard fit, not wrist
+accuracy, and does not establish better tracking or metric monocular depth.
+
+Verification: `npm test` checks the remap against OpenCV-generated coordinates,
+identity images, border interpolation, invalid profiles and resolution mismatches.
+Run `.venv-calibration/bin/python -m unittest discover -s tools/calibration` to check
+checkerboard detection and recovery of known synthetic camera parameters. Physical
+checkerboard calibration and live-camera accuracy improvements remain unmeasured.

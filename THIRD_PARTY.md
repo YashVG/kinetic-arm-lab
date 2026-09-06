@@ -6,3 +6,12 @@
 - Geist and Geist Mono: local Latin font files from the existing app, under the SIL Open Font License. License notices are included in `public/fonts/`.
 
 The club proposal supplies project context. This app is an independent prototype and does not imply club endorsement or integration with its hardware.
+
+## OpenCV calibration
+
+The optional Python utility depends on `opencv-python` (OpenCV, Apache-2.0) and
+NumPy (BSD-3-Clause). They are installed into a local virtual environment, not
+vendored. Calibration and the browser's five-coefficient pinhole remap follow
+[OpenCV's documented camera model](https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html).
+`tests/fixtures/opencv-map.json` contains synthetic reference coordinates generated
+with OpenCV; it contains no captured camera images.

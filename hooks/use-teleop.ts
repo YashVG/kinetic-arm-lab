@@ -10,6 +10,12 @@ import { samplePose } from '@/lib/sample-pose';
 import { HOME, HOME_JOINTS, forward } from '@/lib/kinematics';
 import type { SceneState } from '@/components/arm-scene';
 
+import {
+  parseCameraProfile,
+  createCameraCorrector,
+  type CameraProfile,
+} from '@/lib/camera-calibration';
+
 type Source = 'none' | 'camera' | 'sample';
 const CONNECTIONS = [
   [11, 12],
@@ -78,6 +84,13 @@ function paint(
 export function useTeleop() {
   const engine = useRef(new TeleopController());
   const video = useRef<HTMLVideoElement>(null);
+  const corrected = useRef<HTMLCanvasElement>(null);
+  const original = useRef<HTMLCanvasElement>(null);
+  const profileRef = useRef<CameraProfile | null>(null);
+  const correctionRef = useRef(false);
+  const [profile, setProfile] = useState<CameraProfile | null>(null);
+  const [correction, setCorrection] = useState(false);
+  const [correctionMs, setCorrectionMs] = useState<number | null>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
   const scene = useRef<SceneState>({
     joints: [...HOME_JOINTS],
@@ -182,6 +195,20 @@ export function useTeleop() {
     setSource('none');
     setLoading('');
     setDelegate('');
+    setCorrectionMs(null);
+  }
+  function loadProfile(value: unknown) {
+    const parsed = parseCameraProfile(value);
+    stop();
+    profileRef.current = parsed;
+    setProfile(parsed);
+    correctionRef.current = true;
+    setCorrection(true);
+  }
+  function toggleCorrection(enabled: boolean) {
+    stop();
+    correctionRef.current = enabled && !!profileRef.current;
+    setCorrection(correctionRef.current);
   }
   function consume(frame: PoseFrame) {
     engine.current.ingest(frame, performance.now());
@@ -264,11 +291,16 @@ export function useTeleop() {
         return;
       }
       setLoading('Allow camera access…');
+      const cameraProfile = correctionRef.current ? profileRef.current : null;
       stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          width: cameraProfile
+            ? { exact: cameraProfile.width }
+            : { ideal: 640 },
+          height: cameraProfile
+            ? { exact: cameraProfile.height }
+            : { ideal: 480 },
           frameRate: { ideal: 24, max: 30 },
           facingMode: 'user',
         },
@@ -286,6 +318,14 @@ export function useTeleop() {
         release();
         return;
       }
+      const correctFrame =
+        cameraProfile && corrected.current && original.current
+          ? createCameraCorrector(
+              cameraProfile,
+              corrected.current,
+              original.current,
+            )
+          : null;
       const fail = (message: string) => {
         if (id === generation.current) {
           stop();
@@ -335,7 +375,22 @@ export function useTeleop() {
         lastSent = now;
         lastVideoTime = camera.currentTime;
         const capturedAt = performance.now();
-        createImageBitmap(camera)
+        let input: HTMLVideoElement | HTMLCanvasElement = camera;
+        try {
+          if (correctFrame) {
+            const start = performance.now();
+            input = correctFrame(camera);
+            setCorrectionMs(performance.now() - start);
+          }
+        } catch (error) {
+          fail(
+            error instanceof Error
+              ? error.message
+              : 'Camera correction failed.',
+          );
+          return;
+        }
+        createImageBitmap(input)
           .then((bitmap) => {
             if (id !== generation.current) {
               bitmap.close();
@@ -365,13 +420,15 @@ export function useTeleop() {
       setError(
         name === 'NotAllowedError'
           ? 'Camera permission was denied. Allow camera access in your browser, then try again.'
-          : name === 'NotFoundError'
-            ? 'No webcam was found. Connect one or try sample motion.'
-            : name === 'NotReadableError'
-              ? 'The webcam is busy. Close another app using it, then try again.'
-              : e instanceof Error
-                ? e.message
-                : 'Camera startup failed. Please try again.',
+          : name === 'OverconstrainedError'
+            ? 'Camera cannot provide this profile’s resolution. Disable lens correction or recalibrate in the supported capture mode.'
+            : name === 'NotFoundError'
+              ? 'No webcam was found. Connect one or try sample motion.'
+              : name === 'NotReadableError'
+                ? 'The webcam is busy. Close another app using it, then try again.'
+                : e instanceof Error
+                  ? e.message
+                  : 'Camera startup failed. Please try again.',
       );
     }
   }
@@ -427,6 +484,13 @@ export function useTeleop() {
   }
   return {
     video,
+    corrected,
+    original,
+    profile,
+    correction,
+    correctionMs,
+    loadProfile,
+    toggleCorrection,
     overlay,
     scene,
     source,

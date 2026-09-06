@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ArrowUpRight,
   Camera,
@@ -23,7 +24,8 @@ import {
 import ArmScene from '@/components/arm-scene';
 import { useTeleop } from '@/hooks/use-teleop';
 export default function TeleopLab() {
-  const { video, overlay, scene, ...t } = useTeleop();
+  const { video, overlay, corrected, original, scene, ...t } = useTeleop();
+  const [profileError, setProfileError] = useState('');
   const s = t.snapshot;
   const active = t.source !== 'none';
   const stateLabel = s.engaged
@@ -149,9 +151,19 @@ export default function TeleopLab() {
               playsInline
               muted
               style={{
-                visibility: t.source === 'camera' ? 'visible' : 'hidden',
+                visibility:
+                  t.source === 'camera' && !t.correction ? 'visible' : 'hidden',
               }}
               aria-label="Mirrored webcam feed"
+            />
+            <canvas
+              ref={corrected}
+              className="camera-feed"
+              style={{
+                visibility:
+                  t.source === 'camera' && t.correction ? 'visible' : 'hidden',
+              }}
+              aria-label="Undistorted webcam feed used for pose estimation"
             />
             <canvas
               ref={overlay}
@@ -193,7 +205,9 @@ export default function TeleopLab() {
                 <span className="camera-corner">
                   {t.source === 'sample'
                     ? 'SAMPLE · NO CAMERA'
-                    : 'RIGHT ARM · MIRRORED'}
+                    : t.correction
+                      ? 'UNDISTORTED · MIRRORED'
+                      : 'RIGHT ARM · MIRRORED'}
                 </span>
                 <div className="camera-bottom">
                   <span className={'status-dot ' + (s.tracking ? 'on' : '')} />
@@ -207,6 +221,119 @@ export default function TeleopLab() {
               {t.error}
             </p>
           )}
+          <details className="lens-panel">
+            <summary>
+              Lens correction {t.profile ? '· Profile loaded' : '· Optional'}
+            </summary>
+            <p>
+              Import a checkerboard camera profile. This is separate from the
+              neutral-pose calibration.
+            </p>
+            <label className="profile-upload">
+              Camera profile (.json)
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (!file) return;
+                  try {
+                    if (file.size > 100_000)
+                      throw new Error('Profile is too large (maximum 100 KB).');
+                    t.loadProfile(JSON.parse(await file.text()));
+                    setProfileError('');
+                  } catch (error) {
+                    setProfileError(
+                      error instanceof Error
+                        ? error.message
+                        : 'Could not load profile.',
+                    );
+                  }
+                }}
+              />
+            </label>
+            {profileError && (
+              <p role="alert" className="error-message">
+                {profileError}
+              </p>
+            )}
+            {t.profile && (
+              <>
+                <p>
+                  <strong>{t.profile.name}</strong> · {t.profile.width} ×{' '}
+                  {t.profile.height}
+                </p>
+                <dl className="lens-metrics">
+                  <div>
+                    <dt>Training RMS</dt>
+                    <dd>
+                      {t.profile.rmsPx.toFixed(3)} px ·{' '}
+                      {t.profile.trainingViews} views
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Held-out RMS</dt>
+                    <dd>
+                      {t.profile.validationRmsPx.toFixed(3)} px ·{' '}
+                      {t.profile.validationViews} views
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Correction time</dt>
+                    <dd>
+                      {t.source === 'camera' && t.correctionMs !== null
+                        ? t.correctionMs.toFixed(1) + ' ms / frame'
+                        : '—'}
+                    </dd>
+                  </div>
+                </dl>
+                <label className="lens-toggle">
+                  <input
+                    type="checkbox"
+                    checked={t.correction}
+                    onChange={(event) =>
+                      t.toggleCorrection(event.target.checked)
+                    }
+                  />{' '}
+                  Correct lens distortion before pose estimation
+                </label>
+                <p>
+                  Use the same camera, resolution, zoom and focus as
+                  calibration. Changing this setting stops the camera; enable it
+                  and calibrate your neutral pose again.
+                </p>
+                <p>
+                  Reprojection error measures checkerboard fit, not wrist or
+                  depth accuracy. Black borders are expected; no cropping is
+                  applied.
+                </p>
+              </>
+            )}
+            <figure
+              style={{
+                display:
+                  t.source === 'camera' && t.correction ? 'block' : 'none',
+              }}
+            >
+              <canvas
+                ref={original}
+                className="original-comparison"
+                aria-label="Original webcam image before lens correction"
+              />
+              <figcaption>
+                Original · compare with the undistorted operator view above.
+                Both views are mirrored.
+              </figcaption>
+            </figure>
+            <a
+              href="/camera-calibration-guide.html"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Create a camera profile →
+            </a>
+          </details>
           {!active ? (
             <div className="tracking-instructions">
               <div>

@@ -37,3 +37,7 @@ next-env.d.ts
 /outputs/
 /work/
 *.tsbuildinfo
+
+# Local camera calibration
+/.venv-calibration/
+__pycache__/

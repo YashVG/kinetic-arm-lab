@@ -820,3 +820,70 @@ kbd {
 .control-status {
   display: block;
 }
+
+.lens-panel {
+  padding: 16px 20px;
+  border-top: 1px solid #29383c;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.lens-panel summary {
+  cursor: pointer;
+  color: #c4e4d6;
+  font-weight: 600;
+}
+.lens-panel p {
+  margin: 10px 0;
+  color: #a5b6bd;
+}
+.lens-panel a {
+  color: #b0f2ce;
+  text-decoration: underline;
+}
+.profile-upload {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.profile-upload input {
+  width: 100%;
+  font-size: 12px;
+}
+.lens-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0;
+}
+.lens-toggle input {
+  margin-top: 5px;
+  accent-color: #b0f2ce;
+}
+.lens-metrics {
+  display: grid;
+  gap: 6px;
+}
+.lens-metrics div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.lens-metrics dd {
+  margin: 0;
+  color: #b0f2ce;
+}
+.lens-panel figure {
+  margin: 12px 0;
+}
+.original-comparison {
+  display: block;
+  width: 100%;
+  height: auto;
+  transform: scaleX(-1);
+  border-radius: 6px;
+}
+.lens-panel figcaption {
+  color: #a5b6bd;
+  margin-top: 6px;
+}
