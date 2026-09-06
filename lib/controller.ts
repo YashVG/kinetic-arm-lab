@@ -32,6 +32,7 @@ export type PoseFrame = {
 export const REQUIRED = [11, 12, 14, 16, 23, 24];
 export const MAX_AGE_MS = 300;
 export const MIN_VISIBILITY = 0.65;
+export const MAX_TRAIL_POINTS = 160;
 const vec = (p: Landmark): Vec3 => [p.x, p.y, p.z];
 
 /** Express the right wrist in an orthonormal body frame, in shoulder-span units.
@@ -239,7 +240,7 @@ export class TeleopController {
         !this.trail.length ||
         length(sub(end, this.trail[this.trail.length - 1])) > 0.003
       )
-        this.trail = [...this.trail.slice(-159), end];
+        this.trail = [...this.trail.slice(-(MAX_TRAIL_POINTS - 1)), end];
     }
   }
   disconnect() {

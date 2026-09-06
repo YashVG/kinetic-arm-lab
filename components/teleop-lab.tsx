@@ -1,4 +1,3 @@
-'use client';
 import {
   ArrowUpRight,
   Camera,
@@ -14,7 +13,6 @@ import {
   Square,
   Unplug,
 } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -50,12 +48,12 @@ export default function TeleopLab() {
   return (
     <main className="lab">
       <header className="topbar">
-        <Link className="brand" href="/" aria-label="Kinetic home">
+        <a className="brand" href="/" aria-label="Kinetic home">
           <Move3D size={25} />
           <span>
             KINETIC<span className="brand-dot">.</span>
           </span>
-        </Link>
+        </a>
         <span className="topbar-caption">ARM TELEOPERATION LAB</span>
         <span className="local-badge">
           <span />

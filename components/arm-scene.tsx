@@ -1,7 +1,7 @@
-'use client';
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { MAX_TRAIL_POINTS } from '@/lib/controller';
 import {
   BASE_HEIGHT,
   forward,
@@ -36,7 +36,7 @@ export default function ArmScene({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x0c1418, 1);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.setAttribute(
       'aria-label',
       'Simulated robot arm. Drag to orbit; scroll to zoom.',
@@ -150,6 +150,14 @@ export default function ArmScene({
     );
     scene.add(projection);
     const trailGeometry = new THREE.BufferGeometry();
+    trailGeometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(
+        new Float32Array(MAX_TRAIL_POINTS * 3),
+        3,
+      ).setUsage(THREE.DynamicDrawUsage),
+    );
+    trailGeometry.setDrawRange(0, 0);
     const trail = new THREE.Line(
       trailGeometry,
       new THREE.LineBasicMaterial({
@@ -218,6 +226,8 @@ export default function ArmScene({
       trailGeometry.setFromPoints(
         current.trail.map((v) => new THREE.Vector3(...v)),
       );
+      trailGeometry.setDrawRange(0, current.trail.length);
+      trailGeometry.computeBoundingSphere();
       target.visible = current.engaged;
       projection.visible = current.engaged;
       orbit.update();
