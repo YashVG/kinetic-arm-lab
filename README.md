@@ -17,9 +17,16 @@ Webcam → pose landmarks → body-relative wrist motion
 
 Three.js renders the arm, target, and motion trail. Telemetry shows pose rate, inference latency, landmark visibility, and frame age.
 
-The current system controls end-effector position in a three-joint simulation. Use a level camera and stay upright; torso pitch is not tracked. Depth is inferred from a single camera; it is not a calibrated distance measurement.
+Tests cover calibration with hips missing, coordinate transforms, tracking loss, joint speed limits, and kinematics across 1,331 requested targets. Run them with `npm test`.
 
-Tests cover calibration with hips missing, coordinate transforms, tracking loss, joint speed limits, and kinematics across 1,331 requested targets. Run them with `npm test`. The synthetic demo has been browser-tested; live webcam inference and performance remain unverified.
+## Assumptions and limitations
+
+- **Operator:** Assumes one person facing a level camera, staying upright, with both shoulders, the right elbow, and wrist visible. Calibration requires a still hand.
+- **Reference frame:** Vertical motion uses camera-up. Torso pitch is not tracked, so leaning forward can change the control input.
+- **Depth and confidence:** Monocular depth is an estimate, not a calibrated distance measurement. Landmark visibility scores do not measure positional accuracy.
+- **Robot scope:** Controls end-effector position in a three-joint simulation. Wrist orientation, force feedback, and physical robot integration are not implemented.
+- **Learning:** Uses a fixed pretrained pose model. Calibration sets a neutral position; it does not train the model or improve it from camera data.
+- **Validation:** Tests and the browser sample use synthetic landmarks. Live webcam accuracy, latency, and reliability remain unverified.
 
 ## Try it
 
