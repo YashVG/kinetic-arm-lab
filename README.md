@@ -39,7 +39,11 @@ npm start
 
 Open [localhost:3000](http://localhost:3000), enable the camera, calibrate, and engage control. **Try sample motion** runs the control loop with synthetic landmarks.
 
-[Demo guide](DEMO.md) · [Third-party notices](THIRD_PARTY.md)
+[Demo guide](DEMO.md) · [Third-party notices](THIRD_PARTY.md) · [Automated checks](https://github.com/YashVG/kinetic-arm-lab/actions/workflows/ci.yml)
+
+GitHub Actions runs the control/remapping tests, TypeScript and production build,
+and synthetic OpenCV calibration tests on pushes and pull requests. These checks
+do not establish live-camera accuracy or physical-robot safety.
 
 ## Camera calibration with OpenCV
 
